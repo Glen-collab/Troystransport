@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
@@ -51,6 +51,56 @@ export default function TruckingDispatchBoard() {
     pickupTime: '',
     deliveryDate: ''
   });
+
+  // Touch drag state
+  const [touchDragging, setTouchDragging] = useState(null); // trucker being touch-dragged
+  const [touchPos, setTouchPos] = useState({ x: 0, y: 0 });
+  const ghostRef = useRef(null);
+  const payloadRefs = useRef({});
+
+  // Touch drag handlers
+  const handleTouchStart = useCallback((e, trucker) => {
+    if (isTruckerAssigned(trucker.id)) return;
+    const touch = e.touches[0];
+    setTouchDragging(trucker);
+    setTouchPos({ x: touch.clientX, y: touch.clientY });
+    e.preventDefault();
+  }, [payloads]);
+
+  const handleTouchMove = useCallback((e) => {
+    if (!touchDragging) return;
+    const touch = e.touches[0];
+    setTouchPos({ x: touch.clientX, y: touch.clientY });
+    e.preventDefault();
+  }, [touchDragging]);
+
+  const handleTouchEnd = useCallback((e) => {
+    if (!touchDragging) return;
+    const touch = e.changedTouches[0];
+    const dropX = touch.clientX;
+    const dropY = touch.clientY;
+
+    // Hit-test payload cards
+    for (const [payloadId, el] of Object.entries(payloadRefs.current)) {
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      if (dropX >= rect.left && dropX <= rect.right && dropY >= rect.top && dropY <= rect.bottom) {
+        const payload = payloads.find(p => p.id === payloadId);
+        if (payload && !payload.assignedTrucker && payload.status !== 'completed') {
+          setPayloads(prev => prev.map(p => {
+            if (p.id === payloadId) {
+              return { ...p, assignedTrucker: touchDragging.id, status: 'assigned' };
+            }
+            return p;
+          }));
+        }
+        break;
+      }
+    }
+
+    setTouchDragging(null);
+    e.preventDefault();
+  }, [touchDragging, payloads]);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -359,6 +409,7 @@ export default function TruckingDispatchBoard() {
                 return (
                   <div
                     key={payload.id}
+                    ref={(el) => { payloadRefs.current[payload.id] = el; }}
                     onClick={() => handlePayloadClick(payload)}
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDrop(e, payload.id)}
@@ -367,8 +418,8 @@ export default function TruckingDispatchBoard() {
                       borderRadius: '10px',
                       padding: '16px',
                       border: `2px solid ${
-                        draggedTrucker && !payload.assignedTrucker && !isCompleted
-                          ? '#e94560' 
+                        (draggedTrucker || touchDragging) && !payload.assignedTrucker && !isCompleted
+                          ? '#e94560'
                           : isCompleted ? '#2d5a2d' : '#0f3460'
                       }`,
                       cursor: draggedTrucker && !payload.assignedTrucker && !isCompleted ? 'pointer' : 'default',
@@ -579,7 +630,7 @@ export default function TruckingDispatchBoard() {
           </div>
 
           <p style={{ fontSize: '12px', color: '#666', marginBottom: '16px' }}>
-            Drag or click a trucker, then click a payload to assign
+            Drag, touch-drag, or tap a trucker then tap a payload to assign
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -587,12 +638,15 @@ export default function TruckingDispatchBoard() {
               const isAssigned = isTruckerAssigned(trucker.id);
               const assignment = getTruckerAssignment(trucker.id);
               const isSelected = draggedTrucker?.id === trucker.id;
-              
+
               return (
                 <div
                   key={trucker.id}
                   draggable={!isAssigned}
                   onDragStart={(e) => handleDragStart(e, trucker)}
+                  onTouchStart={(e) => handleTouchStart(e, trucker)}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
                   onClick={() => handleTruckerClick(trucker)}
                   style={{
                     backgroundColor: '#16213e',
@@ -602,7 +656,8 @@ export default function TruckingDispatchBoard() {
                     cursor: isAssigned ? 'not-allowed' : 'grab',
                     opacity: isAssigned ? 0.8 : 1,
                     outline: isSelected ? '2px solid #e94560' : 'none',
-                    transition: 'all 0.2s'
+                    transition: 'all 0.2s',
+                    touchAction: isAssigned ? 'auto' : 'none'
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -1191,6 +1246,35 @@ export default function TruckingDispatchBoard() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Touch drag ghost - follows finger/pen */}
+      {touchDragging && (
+        <div
+          ref={ghostRef}
+          style={{
+            position: 'fixed',
+            left: touchPos.x - 80,
+            top: touchPos.y - 30,
+            width: '160px',
+            padding: '10px 14px',
+            backgroundColor: '#e94560',
+            color: '#fff',
+            borderRadius: '8px',
+            fontSize: '13px',
+            fontWeight: '600',
+            textAlign: 'center',
+            pointerEvents: 'none',
+            zIndex: 999,
+            boxShadow: '0 8px 24px rgba(233,69,96,0.5)',
+            opacity: 0.92
+          }}
+        >
+          {touchDragging.name}
+          <div style={{ fontSize: '10px', opacity: 0.8, marginTop: '2px' }}>
+            {touchDragging.truck}
           </div>
         </div>
       )}
