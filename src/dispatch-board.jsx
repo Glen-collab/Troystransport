@@ -102,6 +102,59 @@ export default function TruckingDispatchBoard() {
     e.preventDefault();
   }, [touchDragging, payloads]);
 
+  // Print dispatch sheet
+  const handlePrint = () => {
+    const activeLoads = payloads.filter(p => p.status !== 'completed');
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    const rows = activeLoads.map(p => {
+      const trucker = p.assignedTrucker ? getTruckerById(p.assignedTrucker) : null;
+      return `<tr>
+        <td>${p.description}</td>
+        <td>${p.origin || ''}</td>
+        <td>${p.destination || ''}</td>
+        <td>${trucker ? trucker.name : ''}</td>
+        <td>${trucker ? trucker.truck : ''}</td>
+        <td>${trucker ? trucker.phone : ''}</td>
+        <td>${p.pickupDate || ''} ${p.pickupTime || ''}</td>
+        <td>${p.deliveryDate || ''}</td>
+        <td>${p.status.toUpperCase()}</td>
+      </tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html><html><head><title>Dispatch Sheet</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; font-size: 11px; padding: 0.4in; color: #000; }
+        h1 { font-size: 16px; margin-bottom: 2px; }
+        .sub { font-size: 10px; color: #555; margin-bottom: 10px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #000; padding: 4px 6px; text-align: left; vertical-align: top; }
+        th { background: #ddd; font-weight: bold; font-size: 10px; text-transform: uppercase; }
+        td { font-size: 10px; }
+        @media print { body { padding: 0; } }
+        @page { size: landscape; margin: 0.4in; }
+      </style></head><body>
+      <h1>Troy's Transport — Dispatch Sheet</h1>
+      <div class="sub">Printed ${dateStr} at ${timeStr} &nbsp;|&nbsp; ${activeLoads.length} active loads</div>
+      <table>
+        <thead><tr>
+          <th>Payload</th><th>Origin</th><th>Destination</th>
+          <th>Driver</th><th>Truck</th><th>Phone</th>
+          <th>Pickup</th><th>Deliver By</th><th>Status</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></body></html>`;
+
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    win.print();
+  };
+
   // Load from localStorage on mount
   useEffect(() => {
     const savedTruckers = localStorage.getItem('dispatch_truckers');
@@ -304,9 +357,26 @@ export default function TruckingDispatchBoard() {
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
-        <h1 style={{ margin: 0, fontSize: '24px', color: '#e94560' }}>
-          🚛 Dispatch Board
-        </h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <h1 style={{ margin: 0, fontSize: '24px', color: '#e94560' }}>
+            🚛 Dispatch Board
+          </h1>
+          <button
+            onClick={handlePrint}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '6px',
+              border: '1px solid #0f3460',
+              backgroundColor: '#0f3460',
+              color: '#7dafce',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: '600'
+            }}
+          >
+            🖨 Print Sheet
+          </button>
+        </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           {draggedTrucker && (
             <div style={{
