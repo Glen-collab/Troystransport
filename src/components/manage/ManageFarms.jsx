@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { store } from '@/lib/store';
-import { Plus, Trash2, Pencil } from 'lucide-react';
+import { Plus, Trash2, Pencil, Link, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,6 +13,15 @@ export default function ManageFarms() {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [farmName, setFarmName] = useState('');
+  const [copiedId, setCopiedId] = useState(null);
+
+  const copyFarmLink = (farmId) => {
+    const url = `${window.location.origin}/farm/${farmId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedId(farmId);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
 
   useEffect(() => {
     store.feedYards.list().then(data => {
@@ -110,6 +119,15 @@ export default function ManageFarms() {
                     <span className="font-medium">{farm.name}</span>
                   </div>
                   <div className="flex gap-1">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => copyFarmLink(farm.id)}
+                      title="Copy farmer link"
+                      className={copiedId === farm.id ? 'text-primary' : ''}
+                    >
+                      {copiedId === farm.id ? <Check className="w-4 h-4" /> : <Link className="w-4 h-4" />}
+                    </Button>
                     <Button size="icon" variant="ghost" onClick={() => { setEditingId(farm.id); setFarmName(farm.name); }}>
                       <Pencil className="w-4 h-4" />
                     </Button>
